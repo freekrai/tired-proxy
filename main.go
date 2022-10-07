@@ -30,6 +30,15 @@ func (t *IdleTracker) Done() <-chan time.Time {
 	return t.timer.C
 }
 
+func contains(s []string, str string) bool {
+	for _, v := range s {
+		if v == str {
+			return true
+		}
+	}
+	return false
+}
+
 func main() {
 	var host = flag.String("host", "http://localhost", "host")
 	var port = flag.String("port", "8080", "port")
@@ -43,10 +52,18 @@ func main() {
 
 	idle := NewIdleTracker(time.Duration(*timeInSeconds) * time.Second)
 
+	blacklist := []string{"/server/health", "/server/ping", "/admin/assets"}
+
 	handler := func(p *httputil.ReverseProxy) func(http.ResponseWriter, *http.Request) {
 		return func(w http.ResponseWriter, r *http.Request) {
-			idle.timer.Reset(idle.idle)
 			log.Println(r.URL)
+
+			if contains(blacklist, r.URL.String()) {
+				//fmt.Println("blacklisted, not resetting URL")
+			} else {
+				idle.timer.Reset(idle.idle)
+			}
+
 			r.Host = remote.Host
 			w.Header().Set("X-Ben", "Rad")
 			p.ServeHTTP(w, r)
